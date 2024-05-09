@@ -2,30 +2,55 @@ import streamlit as st
 import folium
 import osmnx
 import networkx as nx
+import numpy as np
+import pandas as pd
 import leafmap.foliumap as leafmap
 from streamlit_folium import st_folium
 from folium.plugins import Draw
+
 from apps.navigator_offline import (get_location_from_address,
                             get_graph,
+                            compare_find_shortest_path,
                             find_shortest_path) 
 
 BASEMAPS = ['Satellite', 'Roadmap', 'Terrain', 'Hybrid', 'OpenStreetMap']
 TRAVEL_MODE = ['Drive', 'Walk', 'Bike']
-TRAVEL_OPTIMIZER = ['Dijistra', 'Bellman-Ford', 'Floyd Warshall' ]
+TRAVEL_OPTIMIZER = ['Dijkstra', 'Bellman-Ford', 'Floyd Warshall' ]
+ADDRESS_DEFAULT = "[10.7724,106.65922]"
 
-ADDRESS_DEFAULT = "Đại Học Bách Khoa HCM"
+
+
+# Create a session variable
+if 'comparing' not in st.session_state:
+    st.session_state['comparing'] = False
+ #path folder of the data file
 
 
 def clear_text():
     st.session_state["go_from"] = ""
     st.session_state["go_to"] = ""
+@st.cache_data
+def compare_algo():
+    st.session_state['comparing'] = True
+    graph, location_orig, location_dest = get_graph(address_from, address_to)
+    time_cal,routes = compare_find_shortest_path(graph, location_orig, location_dest, optimizer)
 
 
+    time_details = {
+    'Algo' : ['Dijkstra', 'Bellman-Ford', 'Floyd Warshall'],
+    'Time' : [time_cal[0],time_cal[1],0.0],
+    }
+  
+    df = pd.DataFrame.from_dict(time_details, orient="index")
+    df.to_csv("data.csv")
+    # return time_cal
+    return routes
 st.set_page_config(page_title="🚋 Route finder", layout="wide")
 
 # ====== SIDEBAR ======
 with st.sidebar:
 
+ 
     st.title("Choose you travel settings")
 
     st.markdown("A simple app that finds and displays the shortest path between two points on a map.")
@@ -39,17 +64,34 @@ with st.sidebar:
 
     address_from = st.text_input("Go from", key="go_from")
     address_to = st.text_input("Go to", key="go_to")
-    
+
+
+    # st.table(df)
+
     st.button("Clear all address boxes", on_click=clear_text)
+    
+
+    btn = st.button('Compare 3 algos')
+
+
+    if(btn):
+        compare_algo()
+
+    data = pd.read_csv("data.csv")
+    st.write(data) #displays the table of data     
+    
+ 
     st.write(address_to)
 
-    st.info(
-        "This is an open source project and you are very welcome to contribute your "
-        "comments, questions, resources and apps as "
-        "[issues](https://github.com/maxmarkov/streamlit-navigator/issues) or "
-        "[pull requests](https://github.com/maxmarkov/streamlit-navigator/pulls) "
-        "to the [source code](https://github.com/maxmarkov/streamlit-navigator). "
-    )
+
+
+    # st.info(
+    #     "This is an open source project and you are very welcome to contribute your "
+    #     "comments, questions, resources and apps as "
+    #     "[issues](https://github.com/maxmarkov/streamlit-navigator/issues) or "
+    #     "[pull requests](https://github.com/maxmarkov/streamlit-navigator/pulls) "
+    #     "to the [source code](https://github.com/maxmarkov/streamlit-navigator). "
+    # )
 
 
 
@@ -70,11 +112,11 @@ m.add_child(
     folium.ClickForLatLng(format_str='"[" + lat + "," + lng + "]"', alert=True)
 )
 data = None
-
+route =  []
 if address_from and address_to:
 
     # === FIND THE PATH ===
-    graph, location_orig, location_dest = get_graph(address_from, address_to)
+    
     # = Alternative options (mode='place' seems to be the fastest) =
     #graph, location_orig, location_dest = get_graph_from_mode(address_from, address_to, mode="place", city="Manhattan")
     #graph, location_orig, location_dest = get_graph_from_mode(address_from, address_to, mode="address", dist=3000)
@@ -82,7 +124,7 @@ if address_from and address_to:
     # Search information 
     st.markdown(f'**From**: {address_from}')
     st.markdown(f'**To**: {address_to}')
-    st.write(graph)
+    
 
     # re-center
     # leafmap.Map(center=location_orig, zoom=16)
@@ -92,16 +134,41 @@ if address_from and address_to:
     # find the nearest node to the start location
     # folium.Marker( list(location_orig), popup="Liberty Bell", tooltip="Liberty Bell").add_to(m)
     # folium.Marker( list(location_dest), popup="Liberty Bell", tooltip="Liberty Bell").add_to(m)
-    m.add_marker(location=list(location_orig), icon=folium.Icon(color='red', icon='suitcase', prefix='fa'))
-    m.add_marker(location=list(location_dest), icon=folium.Icon(color='green', icon='street-view', prefix='fa'))
+
     # output = st_folium(m, width=700, height=500)
     # print(output)
     # find the shortest path
-    route = find_shortest_path(graph, location_orig, location_dest, optimizer)
+    # if not st.session_state['comparing']:
+    #     graph, location_orig, location_dest = get_graph(address_from, address_to)
+    #     st.write(graph)
+    #     m.add_marker(location=list(location_orig), icon=folium.Icon(color='red', icon='suitcase', prefix='fa'))
+    #     m.add_marker(location=list(location_dest), icon=folium.Icon(color='green', icon='street-view', prefix='fa'))
 
-    osmnx.plot_route_folium(graph, route, m)
-    # map = st_folium(m, height=800, width=1400)
-    print(route)
+        
+    #     route = find_shortest_path(graph, location_orig, location_dest, optimizer)
+
+    #     osmnx.plot_route_folium(graph, route, m)
+    #     # map = st_folium(m, height=800, width=1400)
+    #     print(route)
+    # else:
+
+        
+    graph, location_orig, location_dest = get_graph(address_from, address_to)
+
+    st.write(graph)
+
+    time_cal,routes = compare_find_shortest_path(graph, location_orig, location_dest, optimizer)
+
+    # for i in range(2):
+    osmnx.plot_route_folium(graph, routes[0],m,  route_color= '#ff0000', opacity=0.5)
+    osmnx.plot_route_folium(graph, routes[1],m,  route_color= '#0000ff', opacity=0.5)
+        # map = st_folium(m, height=800, width=1400)
+
+    rc = ['r', 'b']
+    fig, ax = osmnx.plot_graph_routes(graph, routes, route_colors=rc, route_linewidth=6, node_size=0)
+    st.session_state['comparing'] = False
+    st.pyplot(fig)
+
 else:
 
     # m.add_marker(location=(lat, lon), popup=f"lat, lon: {lat}, {lon}", icon=folium.Icon(color='green', icon='eye', prefix='fa'))
