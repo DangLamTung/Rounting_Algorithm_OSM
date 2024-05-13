@@ -23,6 +23,9 @@ ADDRESS_DEFAULT = "[10.7724,106.65922]"
 # Create a session variable
 if 'comparing' not in st.session_state:
     st.session_state['comparing'] = False
+
+if '3short' not in st.session_state:
+    st.session_state['3short'] = False
  #path folder of the data file
 
 
@@ -38,6 +41,23 @@ def compare_algo():
 
     time_details = {
     'Algo' : ['Dijkstra', 'Bellman-Ford', 'Floyd Warshall'],
+    'Time' : [time_cal[0],time_cal[1],0],
+    }
+  
+    df = pd.DataFrame.from_dict(time_details, orient="index")
+    df.to_csv("data.csv")
+    # return time_cal
+    return routes
+
+@st.cache_data
+def short_algo():
+    st.session_state['3short'] = True
+    graph, location_orig, location_dest = get_graph(address_from, address_to)
+    time_cal,routes = compare_find_shortest_path(graph, location_orig, location_dest, optimizer)
+
+
+    time_details = {
+    'Algo' : ['Dijkstra', 'Bellman-Ford', 'Floyd Warshall'],
     'Time' : [time_cal[0],time_cal[1],0.0],
     }
   
@@ -45,6 +65,8 @@ def compare_algo():
     df.to_csv("data.csv")
     # return time_cal
     return routes
+
+
 st.set_page_config(page_title="🚋 Route finder", layout="wide")
 
 # ====== SIDEBAR ======
@@ -76,7 +98,11 @@ with st.sidebar:
 
     if(btn):
         compare_algo()
+    btn1 = st.button('Draw 3 shortest path')
 
+
+    if(btn1):
+        compare_algo()
     data = pd.read_csv("data.csv")
     st.write(data) #displays the table of data     
     
@@ -141,8 +167,7 @@ if address_from and address_to:
     # if not st.session_state['comparing']:
     #     graph, location_orig, location_dest = get_graph(address_from, address_to)
     #     st.write(graph)
-    #     m.add_marker(location=list(location_orig), icon=folium.Icon(color='red', icon='suitcase', prefix='fa'))
-    #     m.add_marker(location=list(location_dest), icon=folium.Icon(color='green', icon='street-view', prefix='fa'))
+
 
         
     #     route = find_shortest_path(graph, location_orig, location_dest, optimizer)
@@ -156,16 +181,41 @@ if address_from and address_to:
     graph, location_orig, location_dest = get_graph(address_from, address_to)
 
     st.write(graph)
-
+    #Draw 3 shortest path using the Yen Algorithm as default
     time_cal,routes = compare_find_shortest_path(graph, location_orig, location_dest, optimizer)
+    
 
-    # for i in range(2):
-    osmnx.plot_route_folium(graph, routes[0],m,  route_color= '#ff0000', opacity=0.5)
-    osmnx.plot_route_folium(graph, routes[1],m,  route_color= '#0000ff', opacity=0.5)
+    rc = ['r', 'b', 'g']
+
+    node_orig = osmnx.nearest_nodes(graph, location_orig[1],location_orig[0])
+    node_dest = osmnx.nearest_nodes(graph, location_dest[1],location_dest[0])
+
+    m.add_marker(location=list(location_orig), icon=folium.Icon(color='red', icon='suitcase', prefix='fa'))
+    m.add_marker(location=list(location_dest), icon=folium.Icon(color='green', icon='street-view', prefix='fa'))
+
+    routes = osmnx.k_shortest_paths(graph, node_orig, node_dest, k=3, weight="length")
+
+
+    
+    k = 3
+    short_routes = []
+    for counter, path in enumerate(routes):
+        short_routes.append(path)
+        if counter == k-1:
+            break
+    print(short_routes)
+    fig, ax = osmnx.plot_graph_routes(
+        graph, short_routes, route_colors=rc,
+        route_linewidth=4, node_size=0)
+    
+        # for i in range(2):
+    osmnx.plot_route_folium(graph, short_routes[0],m,  color= '#ff0000', opacity=1)
+    osmnx.plot_route_folium(graph, short_routes[1],m,  color= '#00ffff', opacity=1)
+    osmnx.plot_route_folium(graph, short_routes[2],m,  color= '#0000ff', opacity=1)
         # map = st_folium(m, height=800, width=1400)
 
-    rc = ['r', 'b']
-    fig, ax = osmnx.plot_graph_routes(graph, routes, route_colors=rc, route_linewidth=6, node_size=0)
+    # rc = ['r', 'b']
+    # fig, ax = osmnx.plot_graph_routes(graph, routes, route_colors=rc, route_linewidth=6, node_size=0)
     st.session_state['comparing'] = False
     st.pyplot(fig)
 
