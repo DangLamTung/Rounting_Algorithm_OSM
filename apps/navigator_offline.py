@@ -105,19 +105,33 @@ def compare_find_shortest_path(graph: MultiDiGraph, location_orig: Tuple[float],
 
     # find the nearest node to the departure and arrival location
     # define origin and desination locations
-    TRAVEL_OPTIMIZER = ['Dijkstra', 'Bellman-Ford' ]
+    TRAVEL_OPTIMIZER = ['Dijkstra', 'Bellman-Ford', 'Floyd Warshall' ]
     node_orig = ox.nearest_nodes(graph, location_orig[1],location_orig[0])
     node_dest = ox.nearest_nodes(graph, location_dest[1],location_dest[0])
     time_cal = []
     routes = []
     for method in TRAVEL_OPTIMIZER:
-        start = time.time()
-        route = nx.shortest_path(graph, node_orig, node_dest, weight='length', method=method.lower())
-        end = time.time()
 
-        routes.append(route)
-        time_cal.append(end  - start)
         # print(end  - start)
+        if method != "Floyd Warshall":
+            start = time.time()
+            route = nx.shortest_path(graph, node_orig, node_dest, weight='length', method=method.lower())
+            end = time.time()
+
+            routes.append(route)
+            time_cal.append(end  - start)
+
+        # This algorithm is slow, so a rework needed
+        # else:
+  
+        #     start = time.time()
+        #     predecessors, _ = nx.floyd_warshall_predecessor_and_distance(graph)
+        #     route = nx.reconstruct_path(node_orig, node_dest, predecessors)
+
+        #     end = time.time()
+
+        #     routes.append(route)
+        #     time_cal.append(end  - start)
     return time_cal,routes
 
 def find_shortest_path(graph: MultiDiGraph, location_orig: Tuple[float], location_dest: Tuple[float], optimizer: str) -> List[int]:
